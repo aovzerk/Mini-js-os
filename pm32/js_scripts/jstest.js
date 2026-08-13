@@ -19,7 +19,39 @@ else {
 while (sum < 12) {
     sum++
 }
-
+const a = {a: 100, b:"asd"}
+console.log(a.a)
+console.log(a.b)
+console.log(a);
 console.log(sum)
 console.log(commentTest)
 console.log("// and /* stay inside strings */")
+
+function add(left, right) {
+    return left + right
+}
+
+const delayed = () => {
+    console.log("timeout")
+}
+
+console.log(add(20, 22))
+setTimeout(delayed, 5000)
+
+const canceledTimeout = () => {
+    console.log("ERROR: canceled timeout fired")
+}
+
+let canceledTimeoutId = setTimeout(canceledTimeout, 200)
+clearTimeout(canceledTimeoutId)
+
+let intervalCount = 0
+const intervalCallback = () => {
+    intervalCount++
+    console.log(intervalCount)
+    if (intervalCount == 3) {
+        clearInterval(intervalId)
+    }
+}
+
+let intervalId = setInterval(intervalCallback, 50)

@@ -34,6 +34,7 @@ typedef struct TerminalWindow {
     int y;
     int pid;
     int refresh;
+    int batch_update;
     int app_type;
     int terminal_size;
     int scroll_line;

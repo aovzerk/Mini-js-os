@@ -7,6 +7,8 @@
 
 #define USER_ARGS   ((char *)0x2E000UL)
 #define USER_STACK  0x2F000UL
+#define USER_HEAP_BASE 0x30000UL
+#define USER_HEAP_SIZE 0x10000UL
 #define DISK_CACHE  ((const u8 *)0x40000UL)
 #define VGA         ((volatile u16 *)0xB8000UL)
 #define MAX_PROCESSES 8
@@ -16,6 +18,7 @@
 #define PAGE_TABLE_BASE 0x90000UL
 #define PROCESS_MEMORY_BASE 0x100000UL
 #define TERMINAL_CAPACITY 256
+#define CONSOLE_HISTORY_ROWS 64
 #define FAT_DATA_LBA (64UL + 2UL * 1009UL)
 
 typedef struct KernelRequest {
@@ -64,6 +67,10 @@ static void cpu_halt(void);
 #pragma aux cpu_halt = "cli" "hlt" modify exact [];
 
 static unsigned cursor;
+static u16 console_history[CONSOLE_HISTORY_ROWS * 80];
+static unsigned console_row;
+static unsigned console_column;
+static unsigned console_view_offset;
 static Process processes[MAX_PROCESSES];
 static unsigned current_process;
 static u8 key_queue[MAX_PROCESSES][64];
@@ -85,10 +92,15 @@ static const u8 scan_ascii_shift[128] = {
   'Z','X','C','V','B','N','M','<','>','?'
 };
 static int keyboard_shift;
+static int keyboard_extended;
+static u16 clock_previous;
+static u32 clock_cycles;
 
 static void update_cursor(void);
 static void console_clear(void);
 static void console_write(const char *text, unsigned length);
+static void console_page_up(void);
+static void console_page_down(void);
 static int load_program(const char name[11]);
 static int load_file(const char name[11], u8 *destination, u32 capacity);
 static int file_app_type(const char name[11]);
@@ -106,8 +118,14 @@ static int spawn_process(const char name[11]);
 static int spawn_command(const char *command);
 static void switch_process(KernelRequest *r, unsigned next);
 static void schedule(KernelRequest *r);
+static void heap_reset(unsigned pid);
+static void *heap_allocate(u32 size);
+static int heap_release(void *pointer);
+static u32 clock_millis(void);
 
 #include "dispatch.c"
 #include "console.c"
 #include "filesystem.c"
 #include "processes.c"
+#include "heap.c"
+#include "clock.c"

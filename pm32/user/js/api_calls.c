@@ -9,9 +9,11 @@ static int execute_myos_call(void)
     int length;
     FileRequest read_request;
     WriteRequest write_request;
+    const char *write_source;
+    Variable *write_variable;
     call_type = VALUE_NUMBER;
     call_number = 0;
-    call_text[0] = 0;
+    call_text = 0;
     if (!accept("myos.")) return 0;
     if (!myos_loaded) {
         error_text = "require(\"myos\") must be called first";
@@ -25,34 +27,58 @@ static int execute_myos_call(void)
         if (!read_string(first, sizeof(first)) || !make_fat_name(first, api_name))
             error_text = "readFile expects a FAT 8.3 name";
         else {
+            call_text = (char *)sys_malloc(MAX_SOURCE + 1);
+            if (!call_text) {
+                error_text = "out of memory";
+                return 1;
+            }
             read_request.name = api_name;
-            read_request.destination = api_buffer;
-            read_request.capacity = sizeof(call_text) - 1;
+            read_request.destination = call_text;
+            read_request.capacity = MAX_SOURCE;
             result = sys_read_file(&read_request);
             if (result >= 0) {
-                for (length = 0; length < result; ++length)
-                    call_text[length] = api_buffer[length];
+                length = result;
                 call_text[length] = 0;
                 call_type = VALUE_STRING;
+            } else {
+                sys_free(call_text);
+                call_text = 0;
             }
         }
     } else if (text_equal(method, "writeFile")) {
         if (!read_string(first, sizeof(first)) || !accept(",") ||
-            !read_string(second, sizeof(second)) || !make_fat_name(first, api_name))
+            !make_fat_name(first, api_name)) {
             error_text = "writeFile expects name and string";
-        else {
+        } else {
+            write_source = second;
+            if (!read_string(second, sizeof(second))) {
+                if (!read_name(second) ||
+                    (write_variable = find_variable(second, 0)) == 0 ||
+                    write_variable->type != VALUE_STRING)
+                    error_text = "writeFile expects a string value";
+                else write_source = write_variable->text;
+            }
+        }
+        if (!error_text) {
             write_request.name = api_name;
-            write_request.source = second;
-            write_request.size = myos_text_length(second);
+            write_request.source = write_source;
+            write_request.size = myos_text_length(write_source);
             result = sys_write_file(&write_request);
         }
     } else if (text_equal(method, "listFiles")) {
-        result = sys_list_files(api_buffer, sizeof(call_text) - 1);
+        call_text = (char *)sys_malloc(512);
+        if (!call_text) {
+            error_text = "out of memory";
+            return 1;
+        }
+        result = sys_list_files(call_text, 511);
         if (result >= 0) {
-            for (length = 0; length < result; ++length)
-                call_text[length] = api_buffer[length];
+            length = result;
             call_text[length] = 0;
             call_type = VALUE_STRING;
+        } else {
+            sys_free(call_text);
+            call_text = 0;
         }
     } else if (text_equal(method, "listProcesses")) {
         result = sys_list_processes(process_records, MAX_PROCESS_RECORDS);
@@ -83,14 +109,19 @@ static int execute_myos_call(void)
         else { b = parse_expression(); sys_send_key((unsigned)a, (unsigned)b); }
     } else if (text_equal(method, "terminalRead")) {
         a = parse_expression();
-        result = sys_terminal_read((unsigned)a, api_buffer);
+        call_text = (char *)sys_malloc(257);
+        if (!call_text) {
+            error_text = "out of memory";
+            return 1;
+        }
+        result = sys_terminal_read((unsigned)a, call_text);
         if (result >= 0) {
-            for (length = 0;
-                 length < result && length + 1 < sizeof(call_text);
-                 ++length)
-                call_text[length] = api_buffer[length];
+            length = result;
             call_text[length] = 0;
             call_type = VALUE_STRING;
+        } else {
+            sys_free(call_text);
+            call_text = 0;
         }
     } else if (text_equal(method, "poweroff")) sys_poweroff();
     else if (text_equal(method, "exit")) sys_exit();
@@ -117,6 +148,10 @@ static int execute_window_call(void)
     }
     if (text_equal(method, "clear")) {
         sys_write("\f", 1);
+    } else if (text_equal(method, "beginUpdate")) {
+        sys_write("\x0E", 1);
+    } else if (text_equal(method, "endUpdate")) {
+        sys_write("\x0F", 1);
     } else if (text_equal(method, "setTitle")) {
         if (!read_string(literal, sizeof(literal)))
             error_text = "window.setTitle expects text";

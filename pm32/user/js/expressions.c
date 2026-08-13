@@ -6,6 +6,13 @@ static long parse_primary(void)
     char name[MAX_NAME];
     Variable *variable;
     skip_space();
+    {
+        const char *saved = cursor;
+        if (execute_timer_call(&value)) return value;
+        cursor = saved;
+        if (execute_function_call(&value)) return value;
+        cursor = saved;
+    }
     if (accept("(")) {
         value = parse_expression();
         if (!accept(")") && !error_text) error_text = "expected ')'";
@@ -22,6 +29,23 @@ static long parse_primary(void)
         if (text_equal(name, "false")) return 0;
         variable = find_variable(name, 0);
         if (!variable) error_text = "unknown variable";
+        else if (variable->type == VALUE_OBJECT) {
+            ObjectProperty *property;
+            if (!accept(".") || !read_name(name)) {
+                error_text = "object property expected";
+                return 0;
+            }
+            property = find_object_property(variable->object, name);
+            if (!property) {
+                error_text = "unknown object property";
+                return 0;
+            }
+            if (property->type == VALUE_STRING) {
+                error_text = "string used as number";
+                return 0;
+            }
+            return property->number;
+        }
         else if (variable->type == VALUE_PROCESS_ARRAY) {
             if (accept(".")) {
                 if (!read_name(name) || !text_equal(name, "length"))

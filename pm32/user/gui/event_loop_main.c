@@ -71,6 +71,7 @@ static void gui_main(void)
                             windows[window].minimized = 0;
                             windows[window].terminal_size = 0;
                             windows[window].scroll_line = 0;
+                            windows[window].batch_update = 0;
                             windows[window].app_type = APP_CONSOLE;
                             windows[window].pid = sys_spawn("shell");
                             active_window = window;

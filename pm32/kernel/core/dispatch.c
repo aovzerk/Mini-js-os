@@ -34,6 +34,7 @@ void kernel_dispatch(KernelRequest *r)
             unsigned process = current_process;
             unsigned parent = processes[process].parent_pid;
 
+            heap_reset(process);
             processes[process].active = 0;
             processes[process].cr3 = 0;
             if (parent < MAX_PROCESSES && processes[parent].active) {
@@ -121,6 +122,7 @@ void kernel_dispatch(KernelRequest *r)
 
         if (current_process == 0 && process > 0 &&
             process < MAX_PROCESSES) {
+            heap_reset(process);
             processes[process].active = 0;
             processes[process].cr3 = 0;
             terminal_size[process] = 0;
@@ -137,6 +139,7 @@ void kernel_dispatch(KernelRequest *r)
             processes[i].cr3 = 0;
         }
         make_address_space(0);
+        heap_reset(0);
         processes[0].active = 1;
         processes[0].started = 1;
         processes[0].esp = USER_STACK;
@@ -252,6 +255,12 @@ void kernel_dispatch(KernelRequest *r)
             to[i] = 0;
             r->result = i;
         }
+    } else if (r->number == 25) {
+        r->result = (u32)heap_allocate(r->arg0);
+    } else if (r->number == 26) {
+        r->result = (u32)heap_release((void *)r->arg0);
+    } else if (r->number == 27) {
+        r->result = clock_millis();
     } else {
         r->result = (u32)-1;
     }

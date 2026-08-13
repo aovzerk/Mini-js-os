@@ -13,7 +13,7 @@ unsigned myos_text_length(const char *text)
 
 void myos_write_text(const char *text)
 {
-    sys_write(text, myos_text_length(text));
+    myos_write_buffer(text, myos_text_length(text));
 }
 
 void myos_write_buffer(const char *buffer, unsigned length)
@@ -30,4 +30,14 @@ void myos_write_buffer(const char *buffer, unsigned length)
         position += count;
         sys_yield();
     }
+}
+
+void *myos_malloc(unsigned size)
+{
+    return sys_malloc(size);
+}
+
+int myos_free(void *pointer)
+{
+    return sys_free(pointer);
 }

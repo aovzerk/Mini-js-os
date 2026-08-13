@@ -9,8 +9,20 @@ static int execute_line(char *line)
     skip_space();
     if (!*cursor || (cursor[0] == '/' && cursor[1] == '/')) return 1;
 
+    if (accept("return")) {
+        if (is_space(*cursor)) function_return_value = parse_expression();
+        else function_return_value = 0;
+        function_returning = 1;
+    }
+
     saved = cursor;
-    if (accept("require")) {
+    if (function_returning) {
+        /* Return is handled above. */
+    } else if (execute_timer_call(&value)) {
+        /* Timer registration. */
+    } else if (execute_function_call(&value)) {
+        /* User function call. */
+    } else if (accept("require")) {
         if (!accept("(") || !read_string(name, sizeof(name)) ||
             !text_equal(name, "myos") || !accept(")"))
             error_text = "only require(\"myos\") is available";
@@ -19,6 +31,7 @@ static int execute_line(char *line)
         /* Window object method. */
     } else if ((cursor = saved, execute_myos_call())) {
         /* Built-in kernel API call. */
+        discard_call_result();
     } else if ((cursor = saved, accept("let") ||
                 (cursor = saved, accept("var")) ||
                 (cursor = saved, accept("const"))) && is_space(*cursor)) {
@@ -37,15 +50,13 @@ static int execute_line(char *line)
                 }
             } else {
                 cursor = initializer;
-                if (execute_myos_call()) {
-                    unsigned i;
-                    variable->type = call_type;
-                    variable->value = call_number;
-                    for (i = 0; i + 1 < sizeof(variable->text) && call_text[i]; ++i)
-                        variable->text[i] = call_text[i];
-                    variable->text[i] = 0;
+                if (parse_object_literal(variable)) {
+                    /* Object literal. */
+                } else if (execute_myos_call()) {
+                    store_call_result(variable);
                 } else {
                     cursor = initializer;
+                    release_variable_value(variable);
                     variable->type = VALUE_NUMBER;
                     variable->value = parse_expression();
                 }
@@ -78,17 +89,15 @@ static int execute_line(char *line)
                     saved = cursor;
                     if (!variable) {
                         error_text = "variable table full";
+                    } else if (parse_object_literal(variable)) {
+                        /* Object literal. */
                     } else if (execute_myos_call()) {
-                        unsigned i;
-                        variable->type = call_type;
-                        variable->value = call_number;
-                        for (i = 0; i + 1 < sizeof(variable->text) && call_text[i]; ++i)
-                            variable->text[i] = call_text[i];
-                        variable->text[i] = 0;
+                        store_call_result(variable);
                     } else {
                         cursor = saved;
                         value = parse_expression();
                         if (variable) {
+                            release_variable_value(variable);
                             variable->type = VALUE_NUMBER;
                             variable->value = value;
                         }

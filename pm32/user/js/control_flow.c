@@ -10,7 +10,14 @@ static int execute_range(unsigned first, unsigned end, unsigned depth)
         int close;
         long condition;
         unsigned iterations;
+        int function_close;
         if (!*line || (line[0] == '/' && line[1] == '/')) { ++i; continue; }
+        function_close = parse_function_header(line, i, end);
+        if (function_close >= 0) {
+            i = (unsigned)function_close + 1;
+            continue;
+        }
+        if (function_close == -2) { report_line(i + 1); return 0; }
         if (begins_word(line, "if")) {
             if (!copy_parentheses(line, control_parts[0]) || brace_change(line) <= 0) {
                 myos_write_text("JS error: expected if (condition) {\n");
@@ -92,6 +99,7 @@ static int execute_range(unsigned first, unsigned end, unsigned depth)
         }
         if (*line == '}') { ++i; continue; }
         if (!execute_line(line)) { report_line(i + 1); return 0; }
+        if (function_returning) return 1;
         ++i;
     }
     return 1;

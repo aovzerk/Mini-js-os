@@ -55,7 +55,14 @@ static void terminal_append(TerminalWindow *window,
     unsigned i;
 
     for (i = 0; i < length; ++i) {
-        if (text[i] == '\b') {
+        if (text[i] == 0x0E) {
+            window->batch_update = 1;
+            window->terminal_size = 0;
+            window->scroll_line = 0;
+        } else if (text[i] == 0x0F) {
+            window->batch_update = 0;
+            window->refresh = 1;
+        } else if (text[i] == '\b') {
             if (window->terminal_size > 0) {
                 --window->terminal_size;
             }
@@ -71,7 +78,7 @@ static void terminal_append(TerminalWindow *window,
     if (window->scroll_line < 0) {
         window->scroll_line = 0;
     }
-    window->refresh = 1;
+    if (!window->batch_update) window->refresh = 1;
 }
 
 static void read_shell_output(TerminalWindow *window)
@@ -103,6 +110,7 @@ static void accept_gui_windows(void)
                 windows[index].minimized = 0;
                 windows[index].terminal_size = 0;
                 windows[index].scroll_line = 0;
+                windows[index].batch_update = 0;
                 windows[index].app_type = APP_GUI;
                 windows[index].pid = pid;
                 if (sys_gui_get_title((unsigned)pid, windows[index].title) < 0)

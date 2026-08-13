@@ -19,7 +19,7 @@ static void run_source(unsigned length)
             source_lines[count++] = source + position + 1;
         }
     }
-    execute_range(0, count, 0);
+    if (execute_range(0, count, 0)) run_timers();
 }
 
 static void js_main(const char *arguments)
@@ -31,6 +31,11 @@ static void js_main(const char *arguments)
         myos_write_text("usage: js FILE.JS\n");
         return;
     }
+    source = (char *)sys_malloc(MAX_SOURCE + 1);
+    if (!source) {
+        myos_write_text("JS error: out of memory\n");
+        return;
+    }
     request.name = fat_name;
     request.destination = source;
     request.capacity = MAX_SOURCE;
@@ -40,4 +45,6 @@ static void js_main(const char *arguments)
         source[length] = 0;
         run_source((unsigned)length);
     }
+    sys_free(source);
+    source = 0;
 }

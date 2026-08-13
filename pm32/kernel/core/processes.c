@@ -40,6 +40,7 @@ static int spawn_process(const char name[11])
         return -1;
     }
     make_address_space(pid);
+    heap_reset(pid);
     processes[pid].active = 1;
     processes[pid].started = 0;
     processes[pid].esp = USER_STACK;
@@ -182,6 +183,7 @@ static int execute(const char *command)
     } while (USER_ARGS[j++] && j < 255);
     result = load_program(name);
     if (result == 0) {
+        heap_reset(current_process);
         processes[current_process].app_type = (u32)app_type;
         set_process_name(current_process, name);
     }

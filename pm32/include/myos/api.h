@@ -25,6 +25,9 @@ int sys_get_app_type(void);
 int sys_list_files(char *buffer, unsigned capacity);
 int sys_list_processes(ProcessInfo *processes, unsigned capacity);
 void sys_poweroff(void);
+void *sys_malloc(unsigned size);
+int sys_free(void *pointer);
+unsigned sys_millis(void);
 
 #pragma aux sys_write = \
     "mov eax,1" "mov ecx,esp" "db 0e8h,0,0,0,0" "pop edx" "add edx,6" "db 0fh,34h" \
@@ -77,5 +80,14 @@ void sys_poweroff(void);
 #pragma aux sys_poweroff = \
     "mov eax,19" "mov ecx,esp" "db 0e8h,0,0,0,0" "pop edx" "add edx,6" "db 0fh,34h" \
     aborts modify exact [eax ebx ecx edx esi edi];
+#pragma aux sys_malloc = \
+    "mov eax,25" "mov ecx,esp" "db 0e8h,0,0,0,0" "pop edx" "add edx,6" "db 0fh,34h" \
+    parm [ebx] value [eax] modify exact [eax ebx ecx edx esi edi];
+#pragma aux sys_free = \
+    "mov eax,26" "mov ecx,esp" "db 0e8h,0,0,0,0" "pop edx" "add edx,6" "db 0fh,34h" \
+    parm [ebx] value [eax] modify exact [eax ebx ecx edx esi edi];
+#pragma aux sys_millis = \
+    "mov eax,27" "mov ecx,esp" "db 0e8h,0,0,0,0" "pop edx" "add edx,6" "db 0fh,34h" \
+    value [eax] modify exact [eax ebx ecx edx esi edi];
 
 #endif

@@ -41,6 +41,7 @@ static void click(int x, int y)
                 windows[index].visible = 1;
                 windows[index].minimized = 0;
                 windows[index].terminal_size = 0;
+                windows[index].batch_update = 0;
                 windows[index].scroll_line = 0;
                 windows[index].app_type = APP_CONSOLE;
                 windows[index].pid = sys_spawn("shell");
