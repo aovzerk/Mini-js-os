@@ -120,7 +120,6 @@ static int write_file(const char name[11], const u8 *source, u32 size)
 
         for (j = 0; j < 512; ++j) {
             sector_buffer[j] = j < count ? source[i * 512UL + j] : 0;
-            ((u8 *)DISK_CACHE)[(cluster - 2) * 512UL + j] = sector_buffer[j];
         }
         if (ata_write_sector(FAT_DATA_LBA + cluster - 2, sector_buffer) < 0) {
             return -5;

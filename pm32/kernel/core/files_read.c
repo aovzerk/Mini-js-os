@@ -34,16 +34,20 @@ static int load_file(const char name[11], u8 *destination, u32 capacity)
         if (size > capacity) {
             return -3;
         }
-        item=DISK_CACHE+(cluster-2)*512UL;
-        {
-            u32 words = size >> 2;
-            u32 *to32 = (u32 *)destination;
-            const u32 *from32 = (const u32 *)item;
+        for (i = 0; i * 512UL < size; ++i) {
+            unsigned j;
+            u32 remaining = size - i * 512UL;
+            u32 count = remaining > 512 ? 512 : remaining;
 
-            for (i = 0; i < words; ++i)
-                to32[i] = from32[i];
-            for (i = words << 2; i < size; ++i)
-                destination[i] = item[i];
+            if (ata_read_sector(
+                    FAT_DATA_LBA + cluster - 2 + i,
+                    sector_buffer
+                ) < 0) {
+                return -4;
+            }
+            for (j = 0; j < count; ++j) {
+                destination[i * 512UL + j] = sector_buffer[j];
+            }
         }
         return (int)size;
     }
