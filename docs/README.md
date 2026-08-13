@@ -16,3 +16,20 @@
   и генератора PNG-иконки.
 - [TODO.md](TODO.md) — приоритетный план стабилизации ядра, JS-runtime, GUI и
   файловой системы.
+
+## Скриншоты
+
+### Process Monitor
+
+<img src="./screenshots/monitor.png" alt="MyOS Process Monitor" width="960">
+
+### GUI
+
+<img src="./screenshots/gui.png" alt="MyOS GUI" width="960">
+
+### Shell
+
+<img src="./screenshots/shell.png" alt="MyOS shell" width="720">
+
+
+
