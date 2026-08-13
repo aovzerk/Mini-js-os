@@ -45,6 +45,11 @@ static void console_clear(void)
     console_render();
 }
 
+static void console_init(void)
+{
+    console_clear();
+}
+
 static void console_advance_line(void)
 {
     unsigned i;
@@ -101,32 +106,4 @@ static void console_write(const char *text, unsigned length)
         }
     }
     console_render();
-}
-
-static int read_key(void)
-{
-    u8 code;
-    if (!(in8(0x64) & 1)) return 0;
-    code = in8(0x60);
-    if (code == 0xE0) {
-        keyboard_extended = 1;
-        return 0;
-    }
-    if (keyboard_extended) {
-        keyboard_extended = 0;
-        if (!(code & 0x80) && code == 0x49) console_page_up();
-        else if (!(code & 0x80) && code == 0x51) console_page_down();
-        return 0;
-    }
-    if (code == 0x2A || code == 0x36) {
-        keyboard_shift = 1;
-        return 0;
-    }
-    if (code == 0xAA || code == 0xB6) {
-        keyboard_shift = 0;
-        return 0;
-    }
-    if (code & 0x80) return 0;
-    if (code == 0x39) return ' ';
-    return keyboard_shift ? scan_ascii_shift[code] : scan_ascii[code];
 }

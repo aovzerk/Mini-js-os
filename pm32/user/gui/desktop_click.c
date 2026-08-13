@@ -6,54 +6,6 @@ static void click(int x, int y)
     int task_x;
     TerminalWindow *window;
 
-    if (x >= 12 && x < 46 &&
-        y >= HEIGHT - 43 && y < HEIGHT - 11) {
-        sys_spawn("poweroff");
-        sys_yield();
-        return;
-    }
-
-    if (((x >= 22 && x < 98) || (x >= 110 && x < 186) ||
-         (x >= 198 && x < 274)) &&
-        y >= 22 && y < 114) {
-        int editor = x >= 110;
-
-        if (x >= 198) {
-            sys_spawn_gui("jsgui monitor.js");
-            sys_yield();
-            accept_gui_windows();
-            redraw();
-            return;
-        }
-
-        if (editor) {
-            sys_spawn_gui("editor");
-            sys_yield();
-            accept_gui_windows();
-            redraw();
-            return;
-        }
-
-        for (index = 0; index < MAX_WINDOWS; ++index) {
-            if (!windows[index].visible) {
-                windows[index].x = 180 + index * 90;
-                windows[index].y = 100 + index * 55;
-                windows[index].visible = 1;
-                windows[index].minimized = 0;
-                windows[index].terminal_size = 0;
-                windows[index].batch_update = 0;
-                windows[index].scroll_line = 0;
-                windows[index].app_type = APP_CONSOLE;
-                windows[index].pid = sys_spawn("shell");
-                active_window = index;
-                sys_yield();
-                read_shell_output(&windows[index]);
-                break;
-            }
-        }
-        redraw();
-        return;
-    }
     if (y >= HEIGHT - 42 && y < HEIGHT - 10) {
         for (index = 0; index < MAX_WINDOWS; ++index) {
             task_x = 58 + index * 184;

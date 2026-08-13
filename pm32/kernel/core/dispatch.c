@@ -1,5 +1,5 @@
 /* Single entry point called by the minimal assembly SYSENTER bridge. */
-void kernel_dispatch(KernelRequest *r)
+static u32 kernel_dispatch_impl(KernelRequest *r)
 {
     r->result = 0;
     r->next_esp = r->user_esp;
@@ -7,11 +7,31 @@ void kernel_dispatch(KernelRequest *r)
     r->next_cr3 = processes[current_process].cr3;
     r->next_ebx = r->arg0;
     r->next_esi = r->arg1;
+    r->next_ecx = r->saved_ecx;
+    r->next_edx = r->saved_edx;
 
-    if (r->number == 0) {
-        console_clear();
-        console_write("> ", 2);
-    } else if (r->number == 1) {
+    /* IRQ0 uses this internal request to preempt ring-3 code. */
+    if (r->number == 35) {
+        r->result = r->saved_eax;
+        schedule(r);
+        return r->result;
+    }
+    if (r->number == 4) {
+        if (current_process == 0 ||
+            processes[current_process].terminal_pid == 0)
+            r->result = (u32)read_key();
+        else if (key_tail[current_process] != key_head[current_process]) {
+            r->result = key_queue[current_process][key_tail[current_process]];
+            key_tail[current_process] =
+                (key_tail[current_process] + 1) & 63;
+        }
+        return r->result;
+    }
+    if (dispatch_input_syscall(r) || dispatch_time_syscall(r) ||
+        dispatch_memory_syscall(r) || dispatch_gui_ipc_syscall(r))
+        return r->result;
+
+    if (r->number == 1) {
         if (current_process == 0 ||
             processes[current_process].terminal_pid == 0) {
             console_write((const char *)r->arg0, (unsigned)r->arg1);
@@ -25,9 +45,11 @@ void kernel_dispatch(KernelRequest *r)
                 terminal_output[channel][n++] = ((const u8 *)r->arg0)[i];
             }
             terminal_size[channel] = n;
+            terminal_history_append(channel, (const u8 *)r->arg0, r->arg1);
         }
     } else if (r->number == 2) {
-        if (current_process == 0) {
+        if (current_process == 0 ||
+            processes[current_process].app_type == APP_GUI) {
             /* PID 0 owns the shell or desktop and is never terminated. */
             r->result = (u32)-1;
         } else {
@@ -51,27 +73,6 @@ void kernel_dispatch(KernelRequest *r)
             r->next_esp = USER_STACK;
             r->next_eip = (u32)user_memory();
         }
-    } else if (r->number == 4) {
-        if (current_process == 0 ||
-            processes[current_process].terminal_pid == 0) {
-            r->result = (u32)read_key();
-        }
-        else if (key_tail[current_process] != key_head[current_process]) {
-            r->result = key_queue[current_process][key_tail[current_process]];
-            key_tail[current_process] =
-                (key_tail[current_process] + 1) & 63;
-            if (processes[current_process].app_type == APP_GUI &&
-                r->result != 27) {
-                unsigned channel = processes[current_process].terminal_pid;
-
-                if (terminal_size[channel] < TERMINAL_CAPACITY) {
-                    terminal_output[channel][terminal_size[channel]++] =
-                        r->result == 13 ? '\n' : (u8)r->result;
-                }
-            }
-        } else {
-            r->result = 0;
-        }
     } else if (r->number == 5) {
         FileRequest *f=(FileRequest *)r->arg0;
         r->result = (u32)load_file(
@@ -87,8 +88,6 @@ void kernel_dispatch(KernelRequest *r)
             processes[r->result].cr3 = 0;
             r->result = (u32)-6;
         }
-    } else if (r->number == 7) {
-        schedule(r);
     } else if (r->number == 8) {
         unsigned process = (unsigned)r->arg0;
 
@@ -129,17 +128,17 @@ void kernel_dispatch(KernelRequest *r)
         }
     } else if (r->number == 12) {
         unsigned i;
-        u8 *source = (u8 *)USER_BASE;
-        u8 *target = (u8 *)PROCESS_MEMORY_BASE;
+        u8 *source = bootstrap_user_memory();
+        u8 *target = (u8 *)PROCESS_MEMORY_PHYSICAL_BASE;
 
-        for (i = 0; i < USER_SIZE; ++i)
+        for (i = 0; i < USER_IMAGE_SIZE; ++i)
             target[i] = source[i];
         for (i = 0; i < MAX_PROCESSES; ++i) {
             processes[i].active = 0;
             processes[i].cr3 = 0;
         }
         make_address_space(0);
-        heap_reset(0);
+        heap_reset_at(PROCESS_MEMORY_PHYSICAL_BASE, 0);
         processes[0].active = 1;
         processes[0].started = 1;
         processes[0].esp = USER_STACK;
@@ -148,13 +147,19 @@ void kernel_dispatch(KernelRequest *r)
         processes[0].terminal_pid = 0;
         processes[0].parent_pid = 0;
         processes[0].waiting_child = 0;
+        processes[0].sleeping_until = 0;
         processes[0].app_type = APP_CONSOLE;
         processes[0].gui_window_requested = 0;
+        processes[0].gui_draw_head = 0;
+        processes[0].gui_draw_tail = 0;
+        processes[0].gui_event_head = 0;
+        processes[0].gui_event_tail = 0;
         set_process_name(0, "SHELL   BIN");
         r->result = processes[0].cr3;
         r->next_cr3 = processes[0].cr3;
     } else if (r->number == 13) {
-        r->result = (u32)load_program("SHELL   BIN");
+        r->result = (u32)load_file(
+            "SHELL   BIN", bootstrap_user_memory(), USER_IMAGE_SIZE);
     } else if (r->number == 14) {
         r->result = (u32)spawn_command((const char *)r->arg0);
         if ((int)r->result >= 0 &&
@@ -244,7 +249,9 @@ void kernel_dispatch(KernelRequest *r)
         char *to = (char *)r->arg1;
         unsigned i = 0;
 
-        if (current_process != 0 || process >= MAX_PROCESSES ||
+        if ((current_process != 0 &&
+             processes[current_process].app_type != APP_GUI) ||
+            process >= MAX_PROCESSES ||
             processes[process].cr3 == 0) {
             r->result = (u32)-1;
         } else {
@@ -255,14 +262,8 @@ void kernel_dispatch(KernelRequest *r)
             to[i] = 0;
             r->result = i;
         }
-    } else if (r->number == 25) {
-        r->result = (u32)heap_allocate(r->arg0);
-    } else if (r->number == 26) {
-        r->result = (u32)heap_release((void *)r->arg0);
-    } else if (r->number == 27) {
-        r->result = clock_millis();
     } else {
         r->result = (u32)-1;
     }
+    return r->result;
 }
-#pragma aux kernel_dispatch parm [esi] modify [eax ebx ecx edx edi];

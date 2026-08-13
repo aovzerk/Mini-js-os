@@ -65,7 +65,6 @@ static int execute_range(unsigned first, unsigned end, unsigned depth)
                     return 0;
                 }
                 if (!execute_range(i + 1, (unsigned)close, depth + 1)) return 0;
-                if (!(iterations & 63)) sys_yield();
             }
             i = (unsigned)close + 1;
             continue;
@@ -92,7 +91,6 @@ static int execute_range(unsigned first, unsigned end, unsigned depth)
                 }
                 if (!execute_range(i + 1, (unsigned)close, depth + 1)) return 0;
                 if (!execute_line(loop_parts[depth][2])) { report_line(i + 1); return 0; }
-                if (!(iterations & 63)) sys_yield();
             }
             i = (unsigned)close + 1;
             continue;

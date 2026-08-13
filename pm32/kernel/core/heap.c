@@ -8,16 +8,21 @@ static void zero_bytes(u8 *memory, u32 size)
     while (size--) *memory++ = 0;
 }
 
-static void heap_reset(unsigned pid)
+static void heap_reset_at(u32 base, unsigned pid)
 {
-    u8 *physical = (u8 *)(PROCESS_MEMORY_BASE + pid * USER_SIZE +
-                          (USER_HEAP_BASE - USER_BASE));
+    u8 *physical = (u8 *)(base + pid * USER_SIZE +
+                          USER_IMAGE_SIZE);
     HeapBlock *first;
 
     zero_bytes(physical, USER_HEAP_SIZE);
     first = (HeapBlock *)physical;
     first->size = USER_HEAP_SIZE - sizeof(HeapBlock);
     first->used = 0;
+}
+
+static void heap_reset(unsigned pid)
+{
+    heap_reset_at(PROCESS_MEMORY_BASE, pid);
 }
 
 static void *heap_allocate(u32 size)

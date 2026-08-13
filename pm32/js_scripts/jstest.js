@@ -23,6 +23,26 @@ const a = {a: 100, b:"asd"}
 console.log(a.a)
 console.log(a.b)
 console.log(a);
+a.a = 200
+a.c = "new"
+console.log(a)
+const windows = [{x: 10, title: "ONE"}, {x: 20, title: "TWO"}]
+console.log(windows)
+console.log(windows.length)
+console.log(windows[0].x)
+const theme = {colors: {background: "navy", text: "white"}}
+console.log(theme)
+
+function inspectWindow(config, label) {
+    let localValue = 77
+    config.x = 99
+    console.log(label)
+    console.log(config)
+    console.log(localValue)
+}
+
+inspectWindow(windows[0], "window copy")
+console.log(windows[0].x)
 console.log(sum)
 console.log(commentTest)
 console.log("// and /* stay inside strings */")

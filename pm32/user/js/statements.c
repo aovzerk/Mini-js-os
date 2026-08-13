@@ -18,15 +18,19 @@ static int execute_line(char *line)
     saved = cursor;
     if (function_returning) {
         /* Return is handled above. */
+    } else if (execute_object_assignment()) {
+        /* Mutable object property. */
+    } else if (execute_screen_call()) {
+        /* Native compositor command. */
     } else if (execute_timer_call(&value)) {
         /* Timer registration. */
     } else if (execute_function_call(&value)) {
         /* User function call. */
     } else if (accept("require")) {
-        if (!accept("(") || !read_string(name, sizeof(name)) ||
-            !text_equal(name, "myos") || !accept(")"))
-            error_text = "only require(\"myos\") is available";
-        else myos_loaded = 1;
+        if (!accept("(") || !read_string(name, sizeof(name)) || !accept(")"))
+            error_text = "require expects a module name";
+        else if (text_equal(name, "myos")) myos_loaded = 1;
+        /* Local .js modules were merged before parsing. */
     } else if ((cursor = saved, execute_window_call())) {
         /* Window object method. */
     } else if ((cursor = saved, execute_myos_call())) {
@@ -50,8 +54,15 @@ static int execute_line(char *line)
                 }
             } else {
                 cursor = initializer;
-                if (parse_object_literal(variable)) {
+                if (read_string(line_buffer, sizeof(line_buffer))) {
+                    release_variable_value(variable);
+                    variable->type = VALUE_STRING;
+                    if (!copy_heap_text(&variable->text, line_buffer))
+                        error_text = "out of memory";
+                } else if ((cursor = initializer, parse_object_literal(variable))) {
                     /* Object literal. */
+                } else if (parse_array_literal(variable)) {
+                    /* Array literal. */
                 } else if (execute_myos_call()) {
                     store_call_result(variable);
                 } else {
@@ -89,8 +100,15 @@ static int execute_line(char *line)
                     saved = cursor;
                     if (!variable) {
                         error_text = "variable table full";
-                    } else if (parse_object_literal(variable)) {
+                    } else if (read_string(line_buffer, sizeof(line_buffer))) {
+                        release_variable_value(variable);
+                        variable->type = VALUE_STRING;
+                        if (!copy_heap_text(&variable->text, line_buffer))
+                            error_text = "out of memory";
+                    } else if ((cursor = saved, parse_object_literal(variable))) {
                         /* Object literal. */
+                    } else if (parse_array_literal(variable)) {
+                        /* Array literal. */
                     } else if (execute_myos_call()) {
                         store_call_result(variable);
                     } else {

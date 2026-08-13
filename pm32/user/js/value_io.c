@@ -74,14 +74,30 @@ static void write_object(Object *object)
     while (property) {
         myos_write_text(property->name);
         sys_write(": ", 2);
-        if (property->type == VALUE_STRING)
-            write_quoted_text(property->text);
-        else
-            write_number(property->number);
+        write_js_value(&property->value);
         property = property->next;
         if (property) sys_write(", ", 2);
     }
     sys_write("}", 1);
+}
+
+static void write_array(JsArray *array)
+{
+    unsigned i;
+    sys_write("[", 1);
+    for (i = 0; array && i < array->length; ++i) {
+        write_js_value(&array->items[i]);
+        if (i + 1 < array->length) sys_write(", ", 2);
+    }
+    sys_write("]", 1);
+}
+
+static void write_js_value(JsValue *value)
+{
+    if (value->type == VALUE_STRING) write_quoted_text(value->text);
+    else if (value->type == VALUE_OBJECT) write_object(value->object);
+    else if (value->type == VALUE_ARRAY) write_array(value->array);
+    else write_number(value->number);
 }
 
 static int print_value(void)
@@ -129,6 +145,10 @@ static int print_value(void)
                 write_object(variable->object);
                 return 1;
             }
+            if (variable && variable->type == VALUE_ARRAY && *cursor == ')') {
+                write_array(variable->array);
+                return 1;
+            }
             if (variable && variable->type == VALUE_OBJECT && accept(".") &&
                 read_name(name) && *cursor == ')') {
                 property = find_object_property(variable->object, name);
@@ -136,9 +156,7 @@ static int print_value(void)
                     error_text = "unknown object property";
                     return 0;
                 }
-                if (property->type == VALUE_STRING)
-                    myos_write_text(property->text);
-                else write_number(property->number);
+                write_js_value(&property->value);
                 return 1;
             }
         }

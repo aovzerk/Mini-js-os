@@ -80,7 +80,6 @@ static void editor_main(void)
     for (;;) {
         key = sys_read_key();
         if (!key) {
-            sys_yield();
             continue;
         }
         if (key == 13) {
@@ -115,7 +114,6 @@ static void editor_main(void)
     for (;;) {
         key = sys_read_key();
         if (!key) {
-            sys_yield();
             continue;
         }
         if (key == 27) {

@@ -73,7 +73,7 @@ static int write_file(const char name[11], const u8 *source, u32 size)
     if (size > 4096) {
         return -3;
     }
-    for (entry = 0; entry < 16; ++entry) {
+    for (entry = 0; entry < 32; ++entry) {
         u8 *item = root + entry * 32;
         u32 cluster;
 
@@ -88,7 +88,7 @@ static int write_file(const char name[11], const u8 *source, u32 size)
             break;
         }
     }
-    if (entry == 16) {
+    if (entry == 32) {
         return -4;
     }
     clusters = (unsigned)((size + 511) / 512);
@@ -124,19 +124,20 @@ static int write_file(const char name[11], const u8 *source, u32 size)
         if (ata_write_sector(FAT_DATA_LBA + cluster - 2, sector_buffer) < 0) {
             return -5;
         }
-        if (ata_read_sector(64UL + fat_sector, sector_buffer) < 0) {
+        if (ata_read_sector(FAT_LBA + fat_sector, sector_buffer) < 0) {
             return -5;
         }
         set_u32(sector_buffer + fat_offset,
                 i + 1 == allocated_clusters
                     ? 0x0FFFFFFFUL
                     : cluster + 1);
-        if (ata_write_sector(64UL + fat_sector, sector_buffer) < 0 ||
-            ata_write_sector(64UL + 1009UL + fat_sector, sector_buffer) < 0) {
+        if (ata_write_sector(FAT_LBA + fat_sector, sector_buffer) < 0 ||
+            ata_write_sector(FAT_LBA + 1009UL + fat_sector, sector_buffer) < 0) {
             return -5;
         }
     }
-    if (ata_write_sector(FAT_DATA_LBA, root) < 0) {
+    if (ata_write_sector(FAT_DATA_LBA + entry / 16,
+                         root + (entry / 16) * 512) < 0) {
         return -5;
     }
     return (int)size;

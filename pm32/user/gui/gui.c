@@ -3,7 +3,7 @@
 
 #define WIDTH 1280
 #define HEIGHT 720
-#define BACKBUFFER_ADDRESS 0x400000UL
+#define BACKBUFFER_ADDRESS 0x800000UL
 
 static volatile u32 *fb;
 static volatile u32 *screen_fb;
@@ -21,6 +21,9 @@ static unsigned icon_height;
 static unsigned blink_ticks;
 static int caret_visible=1;
 static int keyboard_shift;
+static int desktop_pid = -1;
+static int desktop_input_pid = -1;
+static void redraw(void);
 
 #define MAX_WINDOWS 3
 #define TERMINAL_BUFFER 4096
@@ -73,5 +76,6 @@ void _start(void){gui_main();}
 #include "video.c"
 #include "input_devices.c"
 #include "terminal.c"
+#include "native_backend.c"
 #include "desktop.c"
 #include "event_loop.c"

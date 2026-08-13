@@ -131,7 +131,7 @@ function Build-UserProgram([string]$Name) {
 
     $linkCommand =
         "wlink format os2 flat option quiet option nodefaultlibs " +
-        "option alignment=16 option offset=0x20000 " +
+        "option alignment=16 option offset=0x400000 " +
         "option start=_start_ " +
         "file build32\$Name.obj,build32\userlib.obj " +
         "name build32\$Name.lx"
@@ -155,7 +155,7 @@ function Build-UserProgram([string]$Name) {
         $objectOffset = $objectTable + 24 * $objectIndex
         $size = [BitConverter]::ToUInt32($lx, $objectOffset)
         $oldBase = [BitConverter]::ToUInt32($lx, $objectOffset + 4)
-        $newBase = $oldBase - 0x20000
+        $newBase = $oldBase - 0x400000
 
         $objects += [pscustomobject]@{
             Size = $size
@@ -179,7 +179,7 @@ function Build-UserProgram([string]$Name) {
         $sourceOffset = ($sourceOffset + $object.Size + 15) -band (-16)
     }
 
-    # Keep WLink's virtual layout (code at 0x20000, data at 0x30000).
+    # Keep WLink's virtual layout (user image begins at 0x400000).
     # Pattern-based relocation is forbidden because it corrupts constants.
     [IO.File]::WriteAllBytes("$buildDirectory\$Name.bin", $rawImage)
 }
@@ -198,7 +198,7 @@ try {
         throw "icon conversion failed"
     }
 
-    Build-KernelImage "pm32\kernel\core\core.c" "kernel-core" 0x10000
+    Build-KernelImage "pm32\kernel\core\core.c" "kernel-core" 0x20000
 
     $userLibraryCommand =
         "wcc386 -q -s -zl -zq -3r -ox " +
@@ -232,7 +232,15 @@ try {
         throw "system build failed"
     }
 
-    & fasm pm32\boot\boot.asm build32\boot.bin
+    $systemLength = (Get-Item "$buildDirectory\system.bin").Length
+    $systemSectors = [int][Math]::Ceiling($systemLength / 512.0)
+    $kernelSectors = $systemSectors - 16
+    if ($kernelSectors -le 0 -or $kernelSectors -gt 96) {
+        throw "SYSTEM kernel part requires $kernelSectors sectors; maximum is 96"
+    }
+
+    & fasm "-dKERNEL_SECTORS=$kernelSectors" `
+        pm32\boot\boot.asm build32\boot.bin
 
     if ($LASTEXITCODE) {
         throw "boot build failed"
@@ -240,13 +248,13 @@ try {
 
     $bytesPerSector = 512
     $totalSectors = 131072
-    $reservedSectors = 64
+    $reservedSectors = 128
     $fatSectors = 1009
     $fatCount = 2
     $boot = [IO.File]::ReadAllBytes("$buildDirectory\boot.bin")
     $system = [IO.File]::ReadAllBytes("$buildDirectory\system.bin")
 
-    if ($system.Length -gt 63 * $bytesPerSector) {
+    if ($system.Length -gt 127 * $bytesPerSector) {
         throw "SYSTEM exceeds reserved area"
     }
 
@@ -322,13 +330,29 @@ try {
             AppType = 0
         },
         [pscustomobject]@{
+            Name = "DESKTOP JS "
+            Data = [IO.File]::ReadAllBytes("pm32\js_scripts\desktop.js")
+            AppType = 0
+        },
+        [pscustomobject]@{
+            Name = "DESKAPPSJS "
+            Data = [IO.File]::ReadAllBytes("pm32\js_scripts\deskapps.js")
+            AppType = 0
+        },
+        [pscustomobject]@{
+            Name = "WINDOWS JS "
+            Data = [IO.File]::ReadAllBytes("pm32\js_scripts\windows.js")
+            AppType = 0
+        },
+        [pscustomobject]@{
             Name = "SHELLICOPNG"
             Data = [IO.File]::ReadAllBytes("pm32\assets\shell-icon.png")
             AppType = 0
         }
     )
 
-    $nextCluster = 3
+    # Clusters 2 and 3 form a contiguous 32-entry root directory.
+    $nextCluster = 4
 
     foreach ($file in $files) {
         $clusterCount =
@@ -347,6 +371,8 @@ try {
     Set-UInt32 $fat 0 0x0FFFFFF8
     Set-UInt32 $fat 4 ([uint32]::MaxValue)
     Set-UInt32 $fat 8 0x0FFFFFFF
+    Set-UInt32 $fat 8 3
+    Set-UInt32 $fat 12 0x0FFFFFFF
 
     foreach ($file in $files) {
         for (
@@ -406,6 +432,7 @@ try {
     [IO.File]::WriteAllBytes($imagePath, $image)
 
     Write-Host "Built FAT32 build32\$imageName" -ForegroundColor Green
+    Write-Host "SYSTEM load: $systemSectors sectors ($kernelSectors kernel sectors)"
 
     foreach ($file in $files) {
         Write-Host "$($file.Name.Trim()): $($file.Data.Length) bytes"

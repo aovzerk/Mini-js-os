@@ -5,8 +5,12 @@
 
 - [architecture.md](architecture.md) — загрузка, защищённый режим, память,
   процессы и файловая система.
-- [syscalls.md](syscalls.md) — ABI `SYSENTER/SYSEXIT` и таблица системных
+- [syscalls.md](syscalls.md) — ABI `int 80h`/`IRETD` и таблица системных
   вызовов.
+- [kernel-functions.md](kernel-functions.md) — внутренние подсистемы и функции
+  ядра, их входы, результаты и правила изменения.
+- [js-api.md](js-api.md) — полный справочник JS API, объектов, типов, лимитов и
+  примеров.
 - [development.md](development.md) — сборка, добавление программ, проверка и
   известные ограничения.
 - [applications.md](applications.md) — индекс руководств по приложениям;
@@ -30,6 +34,4 @@
 ### Shell
 
 <img src="./screenshots/shell.png" alt="MyOS shell" width="720">
-
-
 

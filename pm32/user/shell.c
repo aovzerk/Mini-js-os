@@ -1,7 +1,7 @@
 #include <myos/api.h>
 #include <myos/userlib.h>
 
-#define COMMAND ((char *)0x2E000UL)
+#define COMMAND ((char *)0x5FE000UL)
 #define MAX_COMMAND 63
 
 void _start(void)
@@ -9,34 +9,29 @@ void _start(void)
     unsigned length;
     int key;
     int graphical = sys_get_pid() != 0;
-    int prompt_already_printed = !graphical;
 
     for (;;) {
-        if (prompt_already_printed)
-            prompt_already_printed = 0;
-        else
-            myos_write_text("> ");
+        myos_write_text("> ");
         length = 0;
         for (;;) {
             key = sys_read_key();
             if (!key) {
-                sys_yield();
                 continue;
             }
             if (key == '\r' || key == '\n') {
-                sys_write("\n", 1);
+                if (!graphical) sys_write("\n", 1);
                 break;
             }
             if (key == '\b') {
                 if (length) {
                     --length;
-                    sys_write("\b", 1);
+                    if (!graphical) sys_write("\b", 1);
                 }
                 continue;
             }
             if (key >= 32 && key < 127 && length < MAX_COMMAND) {
                 COMMAND[length++] = (char)key;
-                sys_write(&COMMAND[length - 1], 1);
+                if (!graphical) sys_write(&COMMAND[length - 1], 1);
             }
         }
         COMMAND[length] = 0;

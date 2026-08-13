@@ -76,11 +76,10 @@ static int parse_function_header(char *line, unsigned first, unsigned end)
     return close;
 }
 
-static int call_function(unsigned index, long *arguments, unsigned count,
+static int call_function(unsigned index, JsValue *arguments, unsigned count,
                          long *result)
 {
     JsFunction *function;
-    Variable saved[MAX_PARAMETERS];
     Variable *parameters[MAX_PARAMETERS];
     unsigned i;
     int previous_returning = function_returning;
@@ -93,36 +92,64 @@ static int call_function(unsigned index, long *arguments, unsigned count,
         error_text = "wrong argument count";
         return 0;
     }
+    ++current_scope;
     for (i = 0; i < count; ++i) {
         parameters[i] = find_variable(function->parameters[i], 1);
-        if (!parameters[i]) { error_text = "variable table full"; return 0; }
-        saved[i] = *parameters[i];
-        parameters[i]->type = VALUE_NUMBER;
-        parameters[i]->value = arguments[i];
-        parameters[i]->text = 0;
-        parameters[i]->object = 0;
+        if (!parameters[i]) { error_text = "variable table full"; break; }
+        move_value_to_variable(&arguments[i], parameters[i]);
     }
     function_returning = 0;
     function_return_value = 0;
-    if (!execute_range(function->first_line, function->end_line, 1)) return 0;
-    *result = function_return_value;
-    for (i = 0; i < count; ++i) {
-        release_variable_value(parameters[i]);
-        *parameters[i] = saved[i];
-    }
+    if (!error_text && execute_range(function->first_line, function->end_line, 1))
+        *result = function_return_value;
+    release_scope(current_scope);
+    --current_scope;
     function_returning = previous_returning;
     function_return_value = previous_value;
     cursor = return_cursor;
-    return 1;
+    return !error_text;
+}
+
+static int parse_argument_value(JsValue *value)
+{
+    const char *saved = cursor;
+    char name[MAX_NAME];
+    Variable *variable;
+    if (read_name(name)) {
+        variable = find_variable(name, 0);
+        skip_space();
+        if (variable && variable->type == VALUE_ARRAY && accept("[")) {
+            long index = parse_expression();
+            if (!accept("]") || index < 0 ||
+                index >= (long)variable->array->length) {
+                error_text = "array index out of range";
+                return 0;
+            }
+            skip_space();
+            if (*cursor == ',' || *cursor == ')') {
+                if (!clone_value(&variable->array->items[index], value))
+                    error_text = "out of memory";
+                return !error_text;
+            }
+        }
+        if (variable && (*cursor == ',' || *cursor == ')')) {
+            if (!clone_variable_value(variable, value)) error_text = "out of memory";
+            return !error_text;
+        }
+    }
+    cursor = saved;
+    return parse_js_value(value);
 }
 
 static int execute_function_call(long *result)
 {
     const char *saved = cursor;
     char name[MAX_NAME];
-    long arguments[MAX_PARAMETERS];
+    JsValue arguments[MAX_PARAMETERS];
     unsigned count = 0;
     int index;
+    unsigned i;
+    for (i = 0; i < MAX_PARAMETERS; ++i) clear_value(&arguments[i]);
     if (!read_name(name) || (index = find_function(name)) < 0 || !accept("(")) {
         cursor = saved;
         return 0;
@@ -133,13 +160,14 @@ static int execute_function_call(long *result)
                 error_text = "too many arguments";
                 return 1;
             }
-            arguments[count++] = parse_expression();
-            if (error_text) return 1;
+            if (!parse_argument_value(&arguments[count])) return 1;
+            ++count;
             if (accept(")")) break;
             if (!accept(",")) { error_text = "expected ',' or ')'"; return 1; }
         }
     }
     call_function((unsigned)index, arguments, count, result);
+    for (i = 0; i < count; ++i) release_value(&arguments[i]);
     return 1;
 }
 
@@ -207,6 +235,7 @@ static void run_timers(void)
     for (;;) {
         unsigned i;
         int active = 0;
+        u32 next_due = 0;
         u32 now = sys_millis();
         for (i = 0; i < MAX_TIMERS; ++i) {
             if (timers[i].used) {
@@ -218,9 +247,14 @@ static void run_timers(void)
                     if (!call_function(timers[i].function_index, 0, 0, &ignored))
                         return;
                 }
+                if (timers[i].used &&
+                    (!next_due ||
+                     (long)(timers[i].due - next_due) < 0))
+                    next_due = timers[i].due;
             }
         }
         if (!active) return;
-        sys_yield();
+        if (next_due && (long)(next_due - sys_millis()) > 0)
+            sys_wait_until(next_due);
     }
 }

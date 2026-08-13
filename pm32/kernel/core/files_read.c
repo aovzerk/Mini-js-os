@@ -15,7 +15,7 @@ static int load_file(const char name[11], u8 *destination, u32 capacity)
     unsigned i;
     const u8 *item;
 
-    for (entry = 0; entry < 16; ++entry) {
+    for (entry = 0; entry < 32; ++entry) {
         u32 cluster;
         u32 size;
         item = DISK_CACHE + entry * 32;
@@ -59,7 +59,7 @@ static int file_app_type(const char name[11])
     unsigned entry;
     unsigned i;
 
-    for (entry = 0; entry < 16; ++entry) {
+    for (entry = 0; entry < 32; ++entry) {
         const u8 *item = DISK_CACHE + entry * 32;
 
         if (!item[0]) {
@@ -78,7 +78,7 @@ static int list_files(char *destination, unsigned capacity)
     unsigned entry;
     unsigned length = 0;
 
-    for (entry = 0; entry < 16; ++entry) {
+    for (entry = 0; entry < 32; ++entry) {
         const u8 *item = DISK_CACHE + entry * 32;
         unsigned i;
         unsigned base_end = 8;

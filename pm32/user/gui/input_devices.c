@@ -1,24 +1,3 @@
-static void wait_write(void)
-{
-    while (in8(0x64) & 2) {}
-}
-
-static void mouse_send(u8 value)
-{
-    wait_write();
-    out8(0x64, 0xD4);
-    wait_write();
-    out8(0x60, value);
-}
-
-static void mouse_init(void)
-{
-    wait_write();
-    out8(0x64, 0xA8);
-    mouse_send(0xF6);
-    mouse_send(0xF4);
-}
-
 static const u16 arrow[18] = {
     1, 3, 7, 15, 31, 63, 127, 255, 511,
     1023, 2047, 4095, 511, 459, 897, 896, 1792, 1792

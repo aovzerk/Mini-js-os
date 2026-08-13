@@ -1,8 +1,9 @@
 align 4
-kernel_request rb 52
+kernel_request rb 0x48
+process_requests rb 8 * 0x48
 
-align 16
-tss rb 104
+align 0x10
+tss rb 0x68
 tss_end:
 
 align 8
@@ -38,6 +39,38 @@ gdt_end:
 gdtr:
     dw gdt_end - gdt - 1
     dd SYSTEM_PHYSICAL + gdt
+
+macro interrupt_gate target, attributes
+{
+    dw target and 0xFFFF
+    dw SEL_KCODE
+    db 0
+    db attributes
+    dw (target shr 16) and 0xFFFF
+}
+
+align 8
+idt:
+repeat 0x100
+    if % <= 0x20
+        interrupt_gate exception_entry, 0x8E
+    else if % = 0x21
+        interrupt_gate irq0_entry, 0x8E
+    else if % = 0x22
+        interrupt_gate irq1_entry, 0x8E
+    else if % = 0x2D
+        interrupt_gate irq12_entry, 0x8E
+    else if % = 0x81
+        interrupt_gate int80_entry, 0xEE
+    else
+        dq 0
+    end if
+end repeat
+idt_end:
+
+idtr:
+    dw idt_end - idt - 1
+    dd SYSTEM_PHYSICAL + idt
 
 
 times 0x2000 - ($ - $$) db 0

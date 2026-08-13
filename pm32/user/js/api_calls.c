@@ -14,6 +14,7 @@ static int execute_myos_call(void)
     call_type = VALUE_NUMBER;
     call_number = 0;
     call_text = 0;
+    call_object = 0;
     if (!accept("myos.")) return 0;
     if (!myos_loaded) {
         error_text = "require(\"myos\") must be called first";
@@ -93,15 +94,56 @@ static int execute_myos_call(void)
         else if (text_equal(method, "spawn")) result = sys_spawn(first);
         else result = sys_spawn_gui(first);
     } else if (text_equal(method, "getPid")) result = sys_get_pid();
+    else if (text_equal(method, "millis")) result = (int)sys_millis();
     else if (text_equal(method, "getAppType")) result = sys_get_app_type();
+    else if (text_equal(method, "pollKeyEvent")) {
+        GuiEvent event;
+        result = sys_gui_poll_event(&event);
+        result = result > 0 && event.type == GUI_EVENT_KEY ? (int)event.value : 0;
+    }
+    else if (text_equal(method, "pollEvent")) {
+        GuiEvent event;
+        result = sys_gui_poll_event(&event);
+        if (result <= 0) {
+            event.type = 0;
+            event.x = 0;
+            event.y = 0;
+            event.value = 0;
+        }
+        call_object = create_object();
+        if (!call_object ||
+            !object_set_number(call_object, "type", event.type) ||
+            !object_set_number(call_object, "x", event.x) ||
+            !object_set_number(call_object, "y", event.y) ||
+            !object_set_number(call_object, "value", event.value))
+            error_text = "out of memory";
+        else call_type = VALUE_OBJECT;
+    }
     else if (text_equal(method, "readKey")) result = sys_read_key();
     else if (text_equal(method, "yield")) sys_yield();
-    else if (text_equal(method, "idle")) { for (;;) sys_yield(); }
+    else if (text_equal(method, "idle")) { for (;;) {} }
     else if (text_equal(method, "createWindow")) {
         result = sys_gui_create_window();
         if (result >= 0) call_type = VALUE_WINDOW;
     }
+    else if (text_equal(method, "createScreen")) {
+        /* Screens default to overlay; desktop explicitly selects layer 0. */
+        result = sys_get_app_type() == APP_GUI ? 1 : -1;
+        if (result >= 0) call_type = VALUE_SCREEN;
+    }
     else if (text_equal(method, "nextWindow")) result = sys_gui_next_window();
+    else if (text_equal(method, "getWindowTitle")) {
+        a = parse_expression();
+        call_text = (char *)sys_malloc(32);
+        if (!call_text) error_text = "out of memory";
+        else if (sys_gui_get_title((unsigned)a, call_text) < 0) {
+            sys_free(call_text);
+            call_text = 0;
+            result = 0;
+        } else {
+            call_type = VALUE_STRING;
+        }
+    }
     else if (text_equal(method, "kill")) { a = parse_expression(); sys_kill((unsigned)a); }
     else if (text_equal(method, "sendKey")) {
         a = parse_expression();
@@ -215,7 +257,7 @@ static int execute_window_call(void)
             write_padding(used, (unsigned)width);
         }
     } else if (text_equal(method, "wait")) {
-        for (;;) sys_yield();
+        for (;;) {}
     } else error_text = "unknown window method";
     if (!error_text && !accept(")")) error_text = "expected ')'";
     return 1;

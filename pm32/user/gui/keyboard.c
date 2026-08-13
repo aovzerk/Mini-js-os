@@ -12,19 +12,28 @@ static const u8 key_ascii_shift[128] = {
 };
 static void handle_key(int key)
 {
-    TerminalWindow *window;
-
-    if (active_window < 0) {
-        return;
+    int input_pid = sys_gui_get_focus();
+    if (input_pid > 0) {
+        native_terminal_echo((u32)input_pid, (u8)key);
+        sys_send_key((unsigned)input_pid, (unsigned)key);
+    } else if (desktop_pid > 0) {
+        GuiEvent event;
+        event.type = GUI_EVENT_KEY;
+        event.x = 0;
+        event.y = 0;
+        event.value = (u32)key;
+        sys_gui_send_event((unsigned)desktop_pid, &event);
     }
-    window = &windows[active_window];
-    if (!window->visible || window->minimized || window->pid < 0) {
-        return;
-    }
+}
 
-    caret_visible = 1;
-    blink_ticks = 0;
-    sys_send_key((unsigned)window->pid, (unsigned)key);
-    sys_yield();
-    read_shell_output(window);
+static void handle_keyboard_scan(u8 value)
+{
+    if (value == 0x2A || value == 0x36) keyboard_shift = 1;
+    else if (value == 0xAA || value == 0xB6) keyboard_shift = 0;
+    else if (!(value & 0x80)) {
+        if (value == 0x39) handle_key(' ');
+        else if (value < 128 && key_ascii[value])
+            handle_key(keyboard_shift ? key_ascii_shift[value]
+                                      : key_ascii[value]);
+    }
 }

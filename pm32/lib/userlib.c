@@ -28,7 +28,6 @@ void myos_write_buffer(const char *buffer, unsigned length)
         }
         sys_write(buffer + position, count);
         position += count;
-        sys_yield();
     }
 }
 

@@ -40,11 +40,44 @@ static long parse_primary(void)
                 error_text = "unknown object property";
                 return 0;
             }
-            if (property->type == VALUE_STRING) {
+            if (property->value.type != VALUE_NUMBER) {
                 error_text = "string used as number";
                 return 0;
             }
-            return property->number;
+            return property->value.number;
+        }
+        else if (variable->type == VALUE_ARRAY) {
+            if (accept(".")) {
+                if (!read_name(name) || !text_equal(name, "length"))
+                    error_text = "array only has length";
+                return (long)variable->array->length;
+            }
+            if (accept("[")) {
+                long index = parse_expression();
+                JsValue *item;
+                if (!accept("]") || index < 0 ||
+                    index >= (long)variable->array->length) {
+                    error_text = "array index out of range";
+                    return 0;
+                }
+                item = &variable->array->items[index];
+                if (item->type == VALUE_OBJECT && accept(".") && read_name(name)) {
+                    ObjectProperty *property =
+                        find_object_property(item->object, name);
+                    if (!property || property->value.type != VALUE_NUMBER) {
+                        error_text = "numeric object property expected";
+                        return 0;
+                    }
+                    return property->value.number;
+                }
+                if (item->type != VALUE_NUMBER) {
+                    error_text = "array value used as number";
+                    return 0;
+                }
+                return item->number;
+            }
+            error_text = "array requires index";
+            return 0;
         }
         else if (variable->type == VALUE_PROCESS_ARRAY) {
             if (accept(".")) {
@@ -128,20 +161,33 @@ static long parse_compare(void)
     return value;
 }
 
-static long parse_expression(void)
+static long parse_equality(void)
 {
     long value = parse_compare();
     for (;;) {
         if (accept("==")) value = value == parse_compare();
         else if (accept("!=")) value = value != parse_compare();
-        else if (accept("&&")) {
-            long right = parse_compare();
-            value = value && right;
-        } else if (accept("||")) {
-            long right = parse_compare();
-            value = value || right;
-        }
         else break;
+    }
+    return value;
+}
+
+static long parse_logical_and(void)
+{
+    long value = parse_equality();
+    while (accept("&&")) {
+        long right = parse_equality();
+        value = value && right;
+    }
+    return value;
+}
+
+static long parse_expression(void)
+{
+    long value = parse_logical_and();
+    while (accept("||")) {
+        long right = parse_logical_and();
+        value = value || right;
     }
     return value;
 }
