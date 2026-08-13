@@ -1,19 +1,23 @@
 require("myos")
 
-myos.write("MyOS JavaScript API test\n")
-myos.writeFile("APIOUT.TXT", "Written from JavaScript\n")
+console.log("MyOS JavaScript API test")
+let writeResult = myos.writeFile("APIOUT.TXT", "Written from JavaScript")
+console.log(writeResult)
 
-myos.write("Reading APIOUT.TXT:\n")
-myos.readFile("APIOUT.TXT")
+let fileBytes = myos.readFile("APIOUT.TXT")
+console.log(fileBytes)
 
-myos.write("Root directory:\n")
-myos.listFiles()
+let files = myos.listFiles()
+console.log(files)
 
-myos.getPid()
-myos.getAppType()
+let pid = myos.getPid()
+let appType = myos.getAppType()
+console.log(pid)
+console.log(appType)
 myos.yield()
 
 // JS.BIN is a console application, so kernel policy returns -1 here.
-myos.createWindow()
+let windowResult = myos.createWindow()
+console.log(windowResult)
 
-myos.write("API test complete\n")
+console.log("API test complete")

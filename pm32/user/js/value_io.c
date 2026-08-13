@@ -49,6 +49,9 @@ static void write_padding(unsigned used, unsigned width)
 static int print_value(void)
 {
     char quote;
+    const char *saved;
+    char name[MAX_NAME];
+    Variable *variable;
     skip_space();
     if (*cursor == '\'' || *cursor == '"') {
         quote = *cursor++;
@@ -66,7 +69,19 @@ static int print_value(void)
             return 0;
         }
         ++cursor;
-    } else write_number(parse_expression());
+    } else {
+        saved = cursor;
+        if (read_name(name)) {
+            variable = find_variable(name, 0);
+            skip_space();
+            if (variable && variable->type == VALUE_STRING && *cursor == ')') {
+                myos_write_text(variable->text);
+                return 1;
+            }
+        }
+        cursor = saved;
+        write_number(parse_expression());
+    }
     return !error_text;
 }
 

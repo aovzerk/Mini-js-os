@@ -42,13 +42,15 @@ const myos = require("myos")
 
 Основные методы:
 
-- `write`, `readFile`, `writeFile`, `listFiles`;
+- `readFile`, `writeFile`, `listFiles`;
 - `exec`, `run`, `spawn`, `spawnGui`, `exit`, `yield`, `idle`;
 - `getPid`, `getAppType`, `readKey`, `sendKey`, `terminalRead`, `kill`;
 - `createWindow`, `nextWindow`, `listProcesses`, `poweroff`.
 
 Файловые имена используют FAT 8.3. `readFile`, `listFiles` и `terminalRead`
-пока выводят часть результатов непосредственно в терминальный канал.
+возвращают строки, а остальные системные методы — числовые коды или значения.
+Встроенные методы `myos` ничего не выводят: явный вывод выполняется только
+через `console.log()`.
 
 ## Окно
 

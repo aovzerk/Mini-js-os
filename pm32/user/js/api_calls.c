@@ -21,18 +21,20 @@ static int execute_myos_call(void)
         error_text = "invalid myos API call";
         return 1;
     }
-    if (text_equal(method, "write")) {
-        if (!read_string(first, sizeof(first))) error_text = "write expects a string";
-        else myos_write_text(first);
-    } else if (text_equal(method, "readFile")) {
+    if (text_equal(method, "readFile")) {
         if (!read_string(first, sizeof(first)) || !make_fat_name(first, api_name))
             error_text = "readFile expects a FAT 8.3 name";
         else {
             read_request.name = api_name;
             read_request.destination = api_buffer;
-            read_request.capacity = MAX_SOURCE;
+            read_request.capacity = sizeof(call_text) - 1;
             result = sys_read_file(&read_request);
-            if (result >= 0) myos_write_buffer(api_buffer, (unsigned)result);
+            if (result >= 0) {
+                for (length = 0; length < result; ++length)
+                    call_text[length] = api_buffer[length];
+                call_text[length] = 0;
+                call_type = VALUE_STRING;
+            }
         }
     } else if (text_equal(method, "writeFile")) {
         if (!read_string(first, sizeof(first)) || !accept(",") ||
@@ -45,10 +47,12 @@ static int execute_myos_call(void)
             result = sys_write_file(&write_request);
         }
     } else if (text_equal(method, "listFiles")) {
-        result = sys_list_files(api_buffer, MAX_SOURCE);
-        if (result > 0) {
-            myos_write_buffer(api_buffer, (unsigned)result);
-            sys_write("\n", 1);
+        result = sys_list_files(api_buffer, sizeof(call_text) - 1);
+        if (result >= 0) {
+            for (length = 0; length < result; ++length)
+                call_text[length] = api_buffer[length];
+            call_text[length] = 0;
+            call_type = VALUE_STRING;
         }
     } else if (text_equal(method, "listProcesses")) {
         result = sys_list_processes(process_records, MAX_PROCESS_RECORDS);
@@ -80,19 +84,19 @@ static int execute_myos_call(void)
     } else if (text_equal(method, "terminalRead")) {
         a = parse_expression();
         result = sys_terminal_read((unsigned)a, api_buffer);
-        if (result > 0) myos_write_buffer(api_buffer, (unsigned)result);
+        if (result >= 0) {
+            for (length = 0;
+                 length < result && length + 1 < sizeof(call_text);
+                 ++length)
+                call_text[length] = api_buffer[length];
+            call_text[length] = 0;
+            call_type = VALUE_STRING;
+        }
     } else if (text_equal(method, "poweroff")) sys_poweroff();
     else if (text_equal(method, "exit")) sys_exit();
     else error_text = "unknown myos API function";
     if (!error_text && !accept(")")) error_text = "expected ')'";
-    if (!error_text && result < 0) {
-        myos_write_text("myos API result: ");
-        write_number(result);
-        sys_write("\n", 1);
-    }
-    if (!error_text) set_result(result);
     call_number = result;
-    (void)length;
     return 1;
 }
 

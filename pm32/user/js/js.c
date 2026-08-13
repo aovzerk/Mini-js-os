@@ -61,12 +61,6 @@ void _start(const char *arguments)
 
 #pragma aux _start parm [ebx];
 
-static void set_result(long value)
-{
-    Variable *variable = find_variable("result", 1);
-    if (variable) variable->value = value;
-}
-
 static int is_space(char ch)
 {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
