@@ -11,8 +11,8 @@ static void redraw(void)
     fill(0, 0, 5, HEIGHT - 52, 0x15394A);
     fill(0, HEIGHT - 52, WIDTH, 52, 0x091722);
     fill(0, HEIGHT - 52, WIDTH, 1, 0x1B4054);
-    fill(WIDTH - 220, HEIGHT - 38, 150, 24, 0x102B3B);
-    draw_text(WIDTH - 202, HEIGHT - 34, "MYOS 32  ONLINE");
+    fill(WIDTH - 150, HEIGHT - 38, 80, 24, 0x102B3B);
+    draw_text(WIDTH - 138, HEIGHT - 34, "MYOS 32");
 
     fill(22, 22, 76, 92, 0x0B1D29);
     fill(22, 22, 76, 2, 0x20D7E5);
